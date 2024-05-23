@@ -6,6 +6,9 @@ import com.mf.skiphand.SkipHandMain;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.mf.skiphand.client.renderer.item.SkipHandRenderer;
+import net.minecraft.core.Holder;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -38,33 +41,28 @@ import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.registries.ForgeRegistries;
 import software.bernie.geckolib.animatable.GeoItem;
 import software.bernie.geckolib.animatable.SingletonGeoAnimatable;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animatable.instance.SingletonAnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.core.animation.AnimationController;
 import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
-import software.bernie.geckolib.util.ClientUtils;
 import software.bernie.geckolib.util.GeckoLibUtil;
 import net.minecraft.world.item.ShieldItem;
-import org.apache.commons.lang3.tuple.ImmutableTriple;
 import org.lwjgl.glfw.GLFW;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import top.theillusivec4.curios.api.CuriosApi;
-import top.theillusivec4.curios.api.SlotContext;
-import top.theillusivec4.curios.api.type.capability.ICurioItem;
 import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 
 import static com.mf.skiphand.SkipHandMain.MODID;
 
-import java.util.Optional;
+
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
 	private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
@@ -79,10 +77,20 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         super(properties);
         SingletonGeoAnimatable.registerSyncedAnimatable(this);
         ImmutableMultimap.Builder<Attribute, AttributeModifier> builder = ImmutableMultimap.builder();
-        builder.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Weapon modifier", 5.0, AttributeModifier.Operation.ADDITION));
-        builder.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Weapon modifier", -2.4000000953674316, AttributeModifier.Operation.ADDITION));
+        builder.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Weapon modifier", 1.0, AttributeModifier.Operation.ADDITION));
+        builder.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Weapon modifier", -2.0, AttributeModifier.Operation.ADDITION));
         this.attributeModifiers = builder.build();
     }
+    @Override
+    public boolean isDamageable(ItemStack stack) {
+        return false;
+    }
+
+    @Override
+    public boolean canBeDepleted() {
+        return false;
+    }
+
     /*public static void client(FMLClientSetupEvent e) {
         EVENT_BUS.addListener(SkipHand::tick);
     }*/
@@ -164,154 +172,34 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         return false;
     }
 
-    /*public static void tick(TickEvent.ClientTickEvent e) {
-    	if (e.phase == TickEvent.Phase.START) {
+    public static Item getCurioById(final LivingEntity entity, final String itemId) {
+        LazyOptional<ICuriosItemHandler> optional = CuriosApi.getCuriosInventory(entity);
 
-            while (SHIFTDOWN.consumeClick()) {
-            	//boolean shiftDown = Minecraft.getInstance().options.keyShift.isDown();
-                if (FUXK_ON.consumeClick()) {
-                    RayTrace rayTrace = new RayTrace();
-                    LivingEntity entityInCrosshair = rayTrace.getEntityInCrosshair(50, 128);
-                	Player owner = Minecraft.getInstance().player;
-                	Entity target = entityInCrosshair;
-                	if(target!=null)
-                	{
-                		pullEntityToPlayer(target,owner);
-                		LOGGER2.info("succes");
-                	}
-                	else {
-                		LOGGER2.info("test");
-                	}
-                	
-                	
-                } 
-            }
+        if (optional.isPresent()) {
+            ICuriosItemHandler itemHandler = optional.orElseThrow(IllegalStateException::new);
 
-        }
-    }*/
-    /*public static void pullEntityToPlayer(Entity entity, Player player) {
-        // 获取玩家的位置
-    	
-        Vec3 playerPos = player.position();
-        // 获取实体的位置
-        Vec3 entityPos = entity.position();
+            // Iterate through all curio slots
+            for (String identifier : itemHandler.getCurios().keySet()) {
+                IDynamicStackHandler stackHandler = itemHandler.getCurios().get(identifier).getStacks();
 
-        // 计算玩家朝向
-        double yaw = Math.toRadians(player.getYRot());
-        double pitch = Math.toRadians(player.getXRot());
+                for (int i = 0; i < stackHandler.getSlots(); i++) {
+                    ItemStack stack = stackHandler.getStackInSlot(i);
 
-        // 计算实体到玩家的方向向量
-        double dx = playerPos.x() - entityPos.x();
-        double dy = playerPos.y() - entityPos.y();
-        double dz = playerPos.z() - entityPos.z();
-        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-        // 计算离玩家面对方向上2格远的位置
-        double newX = playerPos.x() - 2.0 * Math.sin(yaw) * Math.cos(pitch);
-        double newY = playerPos.y() - 2.0 * Math.sin(pitch);
-        double newZ = playerPos.z() + 2.0 * Math.cos(yaw) * Math.cos(pitch);
-        entity.noPhysics=true;
-        // 将实体移动到新位置
-        entity.moveTo(newX, newY, newZ);
-        entity.noPhysics=false;
-            LOGGER2.info("tped");
-            sendPlayerVelocityPacket(entity);
-            
-    }*/
-    /*public static void pushEntityTowardsPlayer(Entity entityToPush, LivingEntity player) {
-        if (entityToPush != null && entityToPush instanceof LivingEntity) {
-            LivingEntity targetEntity = (LivingEntity) entityToPush;
-
-            // 获取玩家位置和目标实体位置
-            Vec3 playerPos = player.position();
-            Vec3 targetPos = targetEntity.position();
-
-            // 计算玩家到目标实体的方向向量
-            Vec3 direction = targetPos.subtract(playerPos).normalize();
-
-            // 计算目标位置（玩家面前2格距离的位置）
-            double newX = playerPos.x + 2.0 * direction.x;
-            double newY = playerPos.y + 2.0 * direction.y;
-            double newZ = playerPos.z + 2.0 * direction.z;
-
-            // 设置目标实体的位置
-            entityToPush.distanceToSqr(player);
-            //targetEntity.setPos(newX, newY, newZ);
-            //targetEntity.teleportTo(newX, newY, newZ);
-        }
-    }*/
-
-    /*private static final Predicate<LivingEntity> ENTITY_PREDICATE = entity -> entity.isAlive() && entity.attackable();
-    private static long lastCallTime = 0; // 记录上次调用的时间戳
-    private static final long COOLDOWN_DURATION = 1000; // 冷却时间，单位为毫秒*/
-    
-
-    /*public static Entity findNearby(Player player) {
-        // 检查是否已经过了冷却时间
-        long currentTime = System.currentTimeMillis();
-        if (currentTime - lastCallTime < COOLDOWN_DURATION) {
-            return null; // 冷却时间未到，直接返回 null
-        }
-
-        Level level = player.level();
-        HitResult result = player.pick(128.0, 1.0F, false);
-        BlockPos startPos = ((BlockHitResult) result).getBlockPos();
-        BlockPos endPos = startPos.relative(((BlockHitResult) result).getDirection());
-        BlockPos posDown = startPos.below();
-        if (!level.isEmptyBlock(posDown) || !level.getBlockState(posDown).blocksMotion()) {
-            for (int tries = 0; tries < 3; ++tries) {
-                BlockPos checkPos = startPos.above(tries + 1);
-                if (level.isEmptyBlock(checkPos)) {
-                    endPos = checkPos;
-                    break;
+                    if (!stack.isEmpty() && SkipHandMain.ITEM_Skiphand_HealUpgrade.getKey().toString().equals(itemId)) {
+                        return stack.getItem();
+                    }
                 }
             }
         }
-        List<LivingEntity> entities = level.getEntitiesOfClass(LivingEntity.class, new AABB(endPos).inflate(5), ENTITY_PREDICATE).stream()
-                .filter(player::hasLineOfSight)
-                .toList();
 
-        if (!entities.isEmpty()) {
-            Random random = new Random();
-            int randomIndex = random.nextInt(entities.size());
-            lastCallTime = currentTime; // 更新上次调用的时间戳
-            Entity returnentity = entities.get(randomIndex);
-            if(returnentity!= null)
-            	{
-            	//entities.clear();
-            	return returnentity;
-            	}
-            else
-            	{
-            	LOGGER2.info("test2");
-            	//entities.clear();
-            	return null;
-            	}
-            
-        } else {
-        	//entities.clear();
-        	LOGGER2.info("test3");
-            return null;
-        }
-    }*/
+        return null;
+    }
+    @Override
+    public int getUseDuration(ItemStack stack) {
+        return 72000;  // 返回一个较长的持续时间
+    }
 
-    /*@Override
-    public InteractionResult useOn(UseOnContext context) {
-        Level level = context.getLevel();
-        BlockPos pos = context.getClickedPos();
-        BlockState blockState = level.getBlockState(pos);
-        ItemStack itemStack = context.getItemInHand();
-        Player player = context.getPlayer();
-        if (context.isSecondaryUseActive()) {
-            return InteractionResult.PASS;
-        } else if (!level.mayInteract(player, pos)) {
-            return InteractionResult.PASS;
-        } else if (!player.mayUseItemAt(pos, context.getClickedFace(), itemStack)) {
-            return InteractionResult.PASS;
-        } else {
-            return InteractionResult.sidedSuccess(level.isClientSide);
-        }
-    }*/
+
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player playerIn, InteractionHand handIn) {
@@ -320,7 +208,8 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         {
         	triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "normal_controller", "normal_anim");
         	if (!playerIn.isSecondaryUseActive()) {
-            
+                playerIn.startUsingItem(handIn);
+                //animation
             	RayTrace rayTrace = new RayTrace();
                 LivingEntity entityInCrosshair = rayTrace.getEntityInCrosshair(50, 128);
                 LOGGER2.info("maybe");
@@ -334,9 +223,13 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
                 	}
                 	return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
             	}
-                else if(ALTDOWN.isDown()&&hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_HealUpgrade.get().asItem())){
+                else if(ALTDOWN.isDown()&&hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_HealUpgrade.get().asItem())
+                        &&!playerIn.getCooldowns().isOnCooldown(getCurioById(playerIn,"item_skiphand_healupgrade"))
+                ){
                     LOGGER2.info("heal!!!!!");
-                    playerIn.teleportTo((double)playerIn.getX() + 0.5, playerIn.getY()+100, (double)playerIn.getZ() + 0.5);
+                    playerIn.heal(8f);
+                    playerIn.getCooldowns().addCooldown(getCurioById(playerIn,"item_skiphand_healupgrade"), 600);
+
                     return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
                 }
             	else {

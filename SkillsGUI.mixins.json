@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "com.mf.skiphand.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "UpdateUIMixin"
+  ],
+  "mixins": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
+

@@ -69,6 +69,9 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
 	private static final RawAnimation FUXK_ANIM = RawAnimation.begin().thenPlay("animation.model.usefuxk");
 	private static final RawAnimation NORMAL_ANIM = RawAnimation.begin().thenPlay("animation.model.stand");
 	private static final RawAnimation SKIP_ANIM = RawAnimation.begin().thenPlay("animation.model.skip");
+	private static final RawAnimation SHIELD_ANIM = RawAnimation.begin().thenPlay("animation.model.guard");
+
+	private static final RawAnimation HEAL_ANIM = RawAnimation.begin().thenPlay("animation.model.useheal");
     private final Multimap<Attribute, AttributeModifier> attributeModifiers;
     public static KeyMapping FUXK_ON;
     public static KeyMapping ALTDOWN;
@@ -128,6 +131,18 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
 				.setSoundKeyframeHandler(state -> {
 					// Use helper method to avoid client-code in common class					
 				}));
+        controllers.add(new AnimationController<>(this, "shield_controller", 1, state -> PlayState.STOP)
+				.triggerableAnim("shield_anim", SHIELD_ANIM)
+				// We've marked the "box_open" animation as being triggerable from the server
+				.setSoundKeyframeHandler(state -> {
+					// Use helper method to avoid client-code in common class
+				}));
+        controllers.add(new AnimationController<>(this, "heal_controller", 1, state -> PlayState.CONTINUE)
+                .triggerableAnim("heal_anim", HEAL_ANIM)
+                // We've marked the "box_open" animation as being triggerable from the server
+                .setSoundKeyframeHandler(state -> {
+                    // Use helper method to avoid client-code in common class
+                }));
 	}
     @Override
     public boolean canAttackBlock(BlockState state, Level worldIn, BlockPos pos, Player player) {
@@ -208,7 +223,12 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         {
         	triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "normal_controller", "normal_anim");
         	if (!playerIn.isSecondaryUseActive()) {
+
                 playerIn.startUsingItem(handIn);
+                //triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "shield_controller", "shield_anim");
+
+
+
                 //animation
             	RayTrace rayTrace = new RayTrace();
                 LivingEntity entityInCrosshair = rayTrace.getEntityInCrosshair(50, 128);
@@ -225,19 +245,20 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
             	}
                 else if(ALTDOWN.isDown()&&hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_HealUpgrade.get().asItem())
                         &&!playerIn.getCooldowns().isOnCooldown(getCurioById(playerIn,"item_skiphand_healupgrade"))
+                        &&(playerIn.getHealth()!=playerIn.getMaxHealth())
                 ){
                     LOGGER2.info("heal!!!!!");
                     playerIn.heal(8f);
                     playerIn.getCooldowns().addCooldown(getCurioById(playerIn,"item_skiphand_healupgrade"), 600);
-
+                    triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "heal_controller", "heal_anim");
                     return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
                 }
             	else {
             		LOGGER2.info("failed");
             		return InteractionResultHolder.pass(stack);
             	}
-                
-            
+
+
         }else {
             HitResult result = playerIn.pick(128.0, 1.0F, false);
             if (result.getType() != HitResult.Type.BLOCK) {

@@ -1,5 +1,7 @@
 package com.mf.skiphand;
 
+import com.mf.skiphand.client.gui.HudRenderHelper;
+import com.mf.skiphand.config.Config;
 import com.mf.skiphand.world.item.*;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -21,11 +23,13 @@ import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.InterModComms;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.event.lifecycle.InterModEnqueueEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -46,6 +50,8 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import com.mf.skiphand.world.item.*;
+
+
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(SkipHandMain.MODID)
 public class SkipHandMain
@@ -105,7 +111,14 @@ public class SkipHandMain
         modEventBus.addListener(this::addCreative);
 
         // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, Config.GENERAL_SPEC,"SkipHandHUD-client.toml");
+    }
+    @Mod.EventBusSubscriber(modid = SkipHandMain.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    public class ClientEventSubscriber {
+        @SubscribeEvent
+        public static void onClientSetupEvent(FMLClientSetupEvent event) {
+            MinecraftForge.EVENT_BUS.register(HudRenderHelper.class);
+        }
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)
@@ -113,13 +126,14 @@ public class SkipHandMain
         // Some common setup code
         LOGGER.info("HELLO FROM COMMON SETUP");
 
-        if (Config.logDirtBlock)
-            LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
+        /*if (Config.logDirtBlock)
+            LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));*/
 
-        LOGGER.info(Config.magicNumberIntroduction + Config.magicNumber);
+        /*LOGGER.info(Config.magicNumberIntroduction + Config.magicNumber);*/
 
-        Config.items.forEach((item) -> LOGGER.info("ITEM >> {}", item.toString()));
+        /*Config.items.forEach((item) -> LOGGER.info("ITEM >> {}", item.toString()));*/
     }
+
 
     // Add the example block item to the building blocks tab
     private void addCreative(BuildCreativeModeTabContentsEvent event)
@@ -147,6 +161,8 @@ public class SkipHandMain
             // Some client setup code
             LOGGER.info("HELLO FROM CLIENT SETUP");
             LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+
         }
+
     }
 }

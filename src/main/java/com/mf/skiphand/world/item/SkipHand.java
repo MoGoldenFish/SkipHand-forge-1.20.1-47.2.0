@@ -69,7 +69,7 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
 	private static final RawAnimation FUXK_ANIM = RawAnimation.begin().thenPlay("animation.model.usefuxk");
 	private static final RawAnimation NORMAL_ANIM = RawAnimation.begin().thenPlay("animation.model.stand");
 	private static final RawAnimation SKIP_ANIM = RawAnimation.begin().thenPlay("animation.model.skip");
-	private static final RawAnimation SHIELD_ANIM = RawAnimation.begin().thenPlay("animation.model.guard");
+	private static final RawAnimation SHIELD_ANIM = RawAnimation.begin().thenPlay("animation.model.shield");
 
 	private static final RawAnimation HEAL_ANIM = RawAnimation.begin().thenPlay("animation.model.useheal");
     private final Multimap<Attribute, AttributeModifier> attributeModifiers;
@@ -200,7 +200,7 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
                 for (int i = 0; i < stackHandler.getSlots(); i++) {
                     ItemStack stack = stackHandler.getStackInSlot(i);
 
-                    if (!stack.isEmpty() && SkipHandMain.ITEM_Skiphand_HealUpgrade.getKey().toString().equals(itemId)) {
+                    if (!stack.isEmpty() && stack.getItem().toString().equals(itemId)) {
                         return stack.getItem();
                     }
                 }
@@ -225,7 +225,6 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         	if (!playerIn.isSecondaryUseActive()) {
 
                 playerIn.startUsingItem(handIn);
-                //triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "shield_controller", "shield_anim");
 
 
 
@@ -234,7 +233,7 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
                 LivingEntity entityInCrosshair = rayTrace.getEntityInCrosshair(50, 128);
                 LOGGER2.info("maybe");
                 Entity target = entityInCrosshair;
-                if(target!=null&&FUXK_ON.isDown())
+                if(target!=null&&FUXK_ON.isDown()&&!ALTDOWN.isDown())
             	{
                 	if (!level.isClientSide) {
                 		triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "fuxk_controller", "fuxk_anim");
@@ -243,17 +242,26 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
                 	}
                 	return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
             	}
-                else if(ALTDOWN.isDown()&&hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_HealUpgrade.get().asItem())
+                else if(!FUXK_ON.isDown()&&ALTDOWN.isDown()&&hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_HealUpgrade.get().asItem())
                         &&!playerIn.getCooldowns().isOnCooldown(getCurioById(playerIn,"item_skiphand_healupgrade"))
                         &&(playerIn.getHealth()!=playerIn.getMaxHealth())
-                ){
+                        )
+                {
                     LOGGER2.info("heal!!!!!");
-                    playerIn.heal(8f);
+                    playerIn.heal(playerIn.getMaxHealth()/2);
                     playerIn.getCooldowns().addCooldown(getCurioById(playerIn,"item_skiphand_healupgrade"), 600);
                     triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "heal_controller", "heal_anim");
                     return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
                 }
-            	else {
+                else if (ALTDOWN.isDown() && FUXK_ON.isDown() && hasCurio(playerIn, SkipHandMain.ITEM_Skiphand_PushUpgrade.get().asItem())
+                        && !playerIn.getCooldowns().isOnCooldown(getCurioById(playerIn, "item_skiphand_pushupgrade"))
+                        )
+                {
+                    triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "shield_controller", "shield_anim");
+                    playerIn.getCooldowns().addCooldown(getCurioById(playerIn,"item_skiphand_pushupgrade"), 200);
+                    doPush(playerIn);
+                }
+                else {
             		LOGGER2.info("failed");
             		return InteractionResultHolder.pass(stack);
             	}
@@ -376,7 +384,17 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
             }
         }
     }
-
+    public static void doPush(LivingEntity attacker) {
+        double radius = 4.0;
+        for (Entity entity : attacker.level().getEntities(attacker, attacker.getBoundingBox().inflate(radius))) {
+            double x = entity.getX() - attacker.getX();
+            double z = entity.getZ() - attacker.getZ();
+            double signX = x / Math.abs(x);
+            double signZ = z / Math.abs(z);
+            entity.setDeltaMovement((radius * signX * 2.0 - x) * 0.20000000298023224, 0.5, (radius * signZ * 2.0 - z) * 0.20000000298023224);
+            sendPlayerVelocityPacket(entity);
+        }
+    }
     public static void sendPlayerVelocityPacket(Entity entity) {
         if (entity instanceof ServerPlayer) {
             ((ServerPlayer) entity).connection.send(new ClientboundSetEntityMotionPacket(entity));

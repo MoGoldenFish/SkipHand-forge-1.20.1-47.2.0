@@ -6,6 +6,7 @@ import com.mf.skiphand.world.item.*;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
@@ -76,8 +77,8 @@ public class SkipHandMain
     //public static final RegistryObject<Item> EXAMPLE_BLOCK_ITEM = ITEMS.register("example_block", () -> new BlockItem(EXAMPLE_BLOCK.get(), new Item.Properties()));
     
     // Creates a new food item with the id "examplemod:example_id", nutrition 1 and saturation 2
-    public static final RegistryObject<Item> ITEM_Skiphand_HealUpgrade = ITEMS.register("item_skiphand_healupgrade", () -> new HealUpgradeRing());
-    //.alwaysEat().nutrition(1).saturationMod(2f).build())));
+    public static final RegistryObject<Item> ITEM_Skiphand_HealUpgrade = ITEMS.register("item_skiphand_healupgrade", () -> new UpgradeRing());
+    public static final RegistryObject<Item> ITEM_Skiphand_PushUpgrade = ITEMS.register("item_skiphand_pushupgrade", () -> new UpgradeRing());
     public static final RegistryObject<SkipHand> SKIP_HAND_ITEM = ITEMS.register("skip_hand", () -> new SkipHand(new Item.Properties().durability(520).rarity(Rarity.EPIC)));
     // Creates a creative tab with the id "examplemod:example_tab" for the example item, that is placed after the combat tab
     public static final RegistryObject<CreativeModeTab> Hand_TAB = CREATIVE_MODE_TABS.register("hand_tab", () -> CreativeModeTab.builder()
@@ -85,8 +86,10 @@ public class SkipHandMain
             .icon(() -> SKIP_HAND_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(ITEM_Skiphand_HealUpgrade.get()); // Add the example item to the tab. For your own tabs, this method is preferred over the event
+                output.accept(ITEM_Skiphand_PushUpgrade.get());
                 output.accept(SKIP_HAND_ITEM.get());
-            }).build());
+            }).title(Component.translatable("itemGroup." + MODID))
+            .build());
 
     public SkipHandMain()
     {

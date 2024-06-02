@@ -1,6 +1,11 @@
 {
   "entities": ["player"],
   "slots": [
-    "hands"
+    "treasures_heal",
+    "treasures_jump",
+    "treasures_fxck",
+    "treasures_push",
+    "treasures_skip"
+
   ]
 }

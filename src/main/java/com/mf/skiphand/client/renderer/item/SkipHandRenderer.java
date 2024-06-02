@@ -9,6 +9,6 @@ import software.bernie.geckolib.renderer.GeoItemRenderer;
 
 public class SkipHandRenderer extends GeoItemRenderer<SkipHand> {
 	public SkipHandRenderer() {
-		super(new DefaultedItemGeoModel<>(new ResourceLocation(GeckoLib.MOD_ID, "skip_hand")));
+		super(new DefaultedItemGeoModel<>(new ResourceLocation(SkipHandMain.MODID, "skip_hand")));
 	}
 }

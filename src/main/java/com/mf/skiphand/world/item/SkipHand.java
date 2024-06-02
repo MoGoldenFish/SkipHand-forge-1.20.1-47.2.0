@@ -6,7 +6,10 @@ import com.mf.skiphand.SkipHandMain;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.mf.skiphand.client.renderer.item.SkipHandRenderer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
+import net.minecraft.core.NonNullList;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.Entity;
@@ -41,6 +44,8 @@ import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import software.bernie.geckolib.animatable.GeoItem;
 import software.bernie.geckolib.animatable.SingletonGeoAnimatable;
@@ -55,17 +60,22 @@ import org.lwjgl.glfw.GLFW;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.SlotContext;
+import top.theillusivec4.curios.api.type.capability.ICurio;
 import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
+import static com.mf.skiphand.SkipHandMain.*;
+import static net.minecraftforge.common.MinecraftForge.EVENT_BUS;
 
-import static com.mf.skiphand.SkipHandMain.MODID;
 
-
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
-	private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+
+
+    private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 	private static final RawAnimation FUXK_ANIM = RawAnimation.begin().thenPlay("animation.model.usefuxk");
 	private static final RawAnimation NORMAL_ANIM = RawAnimation.begin().thenPlay("animation.model.stand");
 	private static final RawAnimation SKIP_ANIM = RawAnimation.begin().thenPlay("animation.model.skip");
@@ -76,6 +86,7 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
     public static KeyMapping FUXK_ON;
     public static KeyMapping ALTDOWN;
     private static final Logger LOGGER2 = LogUtils.getLogger();
+
     public SkipHand(Item.Properties properties) {
         super(properties);
         SingletonGeoAnimatable.registerSyncedAnimatable(this);
@@ -94,9 +105,17 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         return false;
     }
 
-    /*public static void client(FMLClientSetupEvent e) {
+    public static void client(FMLClientSetupEvent e) {
         EVENT_BUS.addListener(SkipHand::tick);
-    }*/
+    }
+    public static void tick(TickEvent.ClientTickEvent e) {
+        if (cooldown > 0) {
+            cooldown--;
+        } else if (jumptimes >= 1) {
+            jumptimes--;
+            cooldown = 50; // 设置每段冷却时间为50 tick
+        }
+    }
     @Override
 	public void initializeClient(Consumer<IClientItemExtensions> consumer) {
 		consumer.accept(new IClientItemExtensions() {
@@ -214,8 +233,14 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         return 72000;  // 返回一个较长的持续时间
     }
 
-
-
+    public static int jumptimes = 0;
+    public static int cooldown = 0;
+    public static int getJumptimes() {
+        return jumptimes;
+    }
+    public static int getCooldown() {
+        return cooldown;
+    }
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player playerIn, InteractionHand handIn) {
         ItemStack stack = playerIn.getItemInHand(handIn);
@@ -225,19 +250,19 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         	if (!playerIn.isSecondaryUseActive()) {
 
                 playerIn.startUsingItem(handIn);
-
-
-
-                //animation
+                boolean isSpacePressed = Minecraft.getInstance().options.keyJump.isDown();
             	RayTrace rayTrace = new RayTrace();
                 LivingEntity entityInCrosshair = rayTrace.getEntityInCrosshair(50, 128);
                 LOGGER2.info("maybe");
                 Entity target = entityInCrosshair;
-                if(target!=null&&FUXK_ON.isDown()&&!ALTDOWN.isDown())
+                if(target!=null&&FUXK_ON.isDown()&&!ALTDOWN.isDown()
+                        &&hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_FxckUpgrade.get().asItem())
+                        &&!playerIn.getCooldowns().isOnCooldown(getCurioById(playerIn,"item_skiphand_fxckupgrade")))
             	{
                 	if (!level.isClientSide) {
                 		triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "fuxk_controller", "fuxk_anim");
                 		teleportFUXK(playerIn);
+                        playerIn.getCooldowns().addCooldown(getCurioById(playerIn,"item_skiphand_fxckupgrade"), 100);
                 		return super.use(serverLevel, playerIn, handIn);
                 	}
                 	return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
@@ -260,6 +285,18 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
                     triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "shield_controller", "shield_anim");
                     playerIn.getCooldowns().addCooldown(getCurioById(playerIn,"item_skiphand_pushupgrade"), 200);
                     doPush(playerIn);
+                }
+                else if (isSpacePressed&&jumptimes<3&&(hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_JumpUpgrade.get().asItem())
+                                                        ||hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_JumpUltimateUpgrade.get().asItem())))
+                {
+
+                        LOGGER2.info("jumped");
+                        doJump(playerIn,level);
+                        if(!hasCurio(playerIn,SkipHandMain.ITEM_Skiphand_JumpUltimateUpgrade.get().asItem()))
+                        {
+                            jumptimes++;
+                            cooldown = 50; // 设置初始冷却时间
+                        }
                 }
                 else {
             		LOGGER2.info("failed");
@@ -292,7 +329,14 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
                     level.playSound(null, endPos, SoundEvents.CHORUS_FRUIT_TELEPORT, playerIn.getSoundSource(), 1.0F, 1.0F);
                     triggerAnim(playerIn, GeoItem.getOrAssignId(playerIn.getItemInHand(handIn), serverLevel), "skip_controller", "skip_anim");
                     teleportAttack(playerIn);
-                    playerIn.getCooldowns().addCooldown(this, 10);
+                    if(hasCurio(playerIn, SkipHandMain.ITEM_Skiphand_SkipUpgrade.get().asItem()))
+                    {
+                        playerIn.getCooldowns().addCooldown(this, 10);
+                    }
+                    else {
+                        playerIn.getCooldowns().addCooldown(this, 150);
+                    }
+
                     //playerIn.getServer().getCommands().performPrefixedCommand(playerIn.createCommandSourceStack(), "/say test");
                     //return super.use(serverLevel, playerIn, handIn);
                 }
@@ -385,21 +429,65 @@ public final class SkipHand extends ShieldItem implements GeoItem, Vanishable {
         }
     }
     public static void doPush(LivingEntity attacker) {
-        double radius = 4.0;
+        double radius = 5.0;
         for (Entity entity : attacker.level().getEntities(attacker, attacker.getBoundingBox().inflate(radius))) {
-            double x = entity.getX() - attacker.getX();
-            double z = entity.getZ() - attacker.getZ();
-            double signX = x / Math.abs(x);
-            double signZ = z / Math.abs(z);
-            entity.setDeltaMovement((radius * signX * 2.0 - x) * 0.20000000298023224, 0.5, (radius * signZ * 2.0 - z) * 0.20000000298023224);
+            // 获取玩家当前的视线方向
+            Vec3 lookVec = attacker.getLookAngle();
+
+            entity.setDeltaMovement(lookVec.x*2, 0.5, lookVec.y*2);
             sendPlayerVelocityPacket(entity);
         }
     }
+    public static void doJump(Player player,Level level) {
+        // 获取玩家当前的视线方向
+        Vec3 lookVec = player.getLookAngle();
+
+        // 定义一个向上的加速度（跳跃高度）
+        double jumpHeight = 1.2;
+
+        // 获取当前玩家的速度
+        Vec3 currentMotion = player.getDeltaMovement();
+        if(!player.isFallFlying())
+        {
+            // 设置新的速度，结合跳跃和面向方向的加速度
+            Vec3 newMotion = new Vec3(lookVec.x * 0.5, jumpHeight, lookVec.z * 0.5);
+            // 更新玩家的速度
+            player.setDeltaMovement(currentMotion.add(newMotion));
+            level.playSound(null, player.getOnPos(), ModSounds.JUMPSOUND.get(), player.getSoundSource(), 1.0F, 1.0F);
+            sendPlayerVelocityPacket(player);
+        }
+        else{
+            // 设置新的速度，结合跳跃和面向方向的加速度
+            Vec3 newMotion = new Vec3(lookVec.x * 0.5, 0.2, lookVec.z * 0.5);
+            // 更新玩家的速度
+            player.setDeltaMovement(currentMotion.add(newMotion));
+            level.playSound(null, player.getOnPos(), ModSounds.JUMPSOUND.get(), player.getSoundSource(), 1.0F, 1.0F);
+            sendPlayerVelocityPacket(player);
+        }
+
+
+    }
+
+
     public static void sendPlayerVelocityPacket(Entity entity) {
         if (entity instanceof ServerPlayer) {
             ((ServerPlayer) entity).connection.send(new ClientboundSetEntityMotionPacket(entity));
         }
     }
+    public static boolean isCuriosVisible(Player player, String itemid, int index) {
+        AtomicBoolean isVisible = new AtomicBoolean(false);
+
+        CuriosApi.getCuriosInventory(player)
+                .ifPresent(handler -> handler.getStacksHandler(itemid).ifPresent(stacksHandler -> {
+                    NonNullList<Boolean> renderStatuses = stacksHandler.getRenders();
+                    if (index >= 0 && index < renderStatuses.size()) {
+                        isVisible.set(renderStatuses.get(index));
+                    }
+                }));
+
+        return isVisible.get();
+    }
+
 
 
     @Override

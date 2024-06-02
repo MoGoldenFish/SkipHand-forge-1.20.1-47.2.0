@@ -1,12 +1,18 @@
 package com.mf.skiphand;
 
+import com.mf.skiphand.block.ChitoseFumoBlock;
+import com.mf.skiphand.block.entity.ChitoseFumoBlockEntity;
 import com.mf.skiphand.client.gui.HudRenderHelper;
 import com.mf.skiphand.config.Config;
+import com.mf.skiphand.registry.BlockEntityRegistry;
+import com.mf.skiphand.util.ModSounds;
 import com.mf.skiphand.world.item.*;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
@@ -16,6 +22,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraftforge.api.distmarker.Dist;
@@ -35,6 +42,8 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import com.mf.skiphand.registry.BlockEntityRegistry;
+import com.mf.skiphand.registry.BlockRegistry;
 import software.bernie.geckolib.GeckoLib;
 
 import org.slf4j.Logger;
@@ -70,23 +79,38 @@ public class SkipHandMain
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
     //public static final RegistryObject<EntityType<ThrownPullClayBall>> THROWN_PULL_CLAY_BALL = throwableItem("pull_clay_ball", ThrownPullClayBall::new);
     //public static final RegistryObject<Item> PULL_CLAY_BALL = ITEMS.register("pull_clay_ball", () -> new PullClayBall(new Item.Properties()));
-
+    //public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, MODID);
+    //public static final RegistryObject<SoundEvent> JUMPSOUND = SOUND_EVENTS.register("jump_sound",
+    //        () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(MODID, "sounds/jump_sound.ogg")));
     // Creates a new Block with the id "examplemod:example_block", combining the namespace and path
     //public static final RegistryObject<Block> EXAMPLE_BLOCK = BLOCKS.register("example_block", () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE)));
     // Creates a new BlockItem with the id "examplemod:example_block", combining the namespace and path
     //public static final RegistryObject<Item> EXAMPLE_BLOCK_ITEM = ITEMS.register("example_block", () -> new BlockItem(EXAMPLE_BLOCK.get(), new Item.Properties()));
-    
+
+
     // Creates a new food item with the id "examplemod:example_id", nutrition 1 and saturation 2
     public static final RegistryObject<Item> ITEM_Skiphand_HealUpgrade = ITEMS.register("item_skiphand_healupgrade", () -> new UpgradeRing());
     public static final RegistryObject<Item> ITEM_Skiphand_PushUpgrade = ITEMS.register("item_skiphand_pushupgrade", () -> new UpgradeRing());
+    public static final RegistryObject<Item> ITEM_Skiphand_JumpUpgrade = ITEMS.register("item_skiphand_jumpupgrade", () -> new UpgradeRing());
+    public static final RegistryObject<Item> ITEM_Skiphand_JumpUltimateUpgrade = ITEMS.register("item_skiphand_jumpultimateupgrade", () -> new UpgradeRing());
+    public static final RegistryObject<Item> ITEM_Skiphand_FxckUpgrade = ITEMS.register("item_skiphand_fxckupgrade", () -> new UpgradeRing());
+    public static final RegistryObject<Item> ITEM_Skiphand_SkipUpgrade = ITEMS.register("item_skiphand_skipupgrade", () -> new UpgradeRing());
     public static final RegistryObject<SkipHand> SKIP_HAND_ITEM = ITEMS.register("skip_hand", () -> new SkipHand(new Item.Properties().durability(520).rarity(Rarity.EPIC)));
     // Creates a creative tab with the id "examplemod:example_tab" for the example item, that is placed after the combat tab
+    public static final RegistryObject<BlockItem> CHITOSE_FUMO_ITEM = ITEMS.register("chitose_fumo",
+            () -> new ChitoseFumoItem(BlockRegistry.CHITOSE_FUMO.get(),
+                    new Item.Properties()));
     public static final RegistryObject<CreativeModeTab> Hand_TAB = CREATIVE_MODE_TABS.register("hand_tab", () -> CreativeModeTab.builder()
             .withTabsBefore(CreativeModeTabs.COMBAT)
             .icon(() -> SKIP_HAND_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(ITEM_Skiphand_HealUpgrade.get()); // Add the example item to the tab. For your own tabs, this method is preferred over the event
                 output.accept(ITEM_Skiphand_PushUpgrade.get());
+                output.accept(ITEM_Skiphand_JumpUpgrade.get());
+                output.accept(ITEM_Skiphand_JumpUltimateUpgrade.get());
+                output.accept(ITEM_Skiphand_FxckUpgrade.get());
+                output.accept(ITEM_Skiphand_SkipUpgrade.get());
+                output.accept(CHITOSE_FUMO_ITEM.get());
                 output.accept(SKIP_HAND_ITEM.get());
             }).title(Component.translatable("itemGroup." + MODID))
             .build());
@@ -94,10 +118,11 @@ public class SkipHandMain
     public SkipHandMain()
     {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        ModSounds.SOUNDS.register(modEventBus);
         GeckoLib.initialize();
         // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
-        //modEventBus.addListener(SkipHand::client);
+        modEventBus.addListener(SkipHand::client);
         modEventBus.addListener(SkipHand::keyBind);
 
         // Register the Deferred Register to the mod event bus so blocks get registered
@@ -106,7 +131,8 @@ public class SkipHandMain
         ITEMS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
-
+        BlockEntityRegistry.TILES.register(modEventBus);
+        BlockRegistry.BLOCKS.register(modEventBus);
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
 

@@ -1,5 +1,6 @@
 package com.mf.skiphand;
 import com.mf.skiphand.client.renderer.block.ChitoseFumoRenderer;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraftforge.api.distmarker.Dist;
